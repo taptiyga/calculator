@@ -1,61 +1,165 @@
 const display = document.getElementById("display");
 
-function appendValue(value) {
-  display.value += value;
-}
+const operators = ["+", "-", "*", "/"];
 
 function clearDisplay() {
   display.value = "";
 }
 
+function appendNumber(num) {
+  display.value += num;
+}
+
+function appendDot() {
+  const tokens = display.value.split(/[\+\-\*\/\(\)]/);
+  const lastToken = tokens[tokens.length - 1];
+
+  if (!lastToken.includes(".")) {
+    display.value += ".";
+  }
+}
+
+function appendBracket(bracket) {
+  display.value += bracket;
+}
+
+function appendOperator(operator) {
+  const value = display.value;
+
+  if (value === "") {
+    // Разрешаем только минус в начале
+    if (operator === "-") {
+      display.value = "-";
+    }
+    return;
+  }
+
+  const lastChar = value.slice(-1);
+
+  // Если последний символ оператор
+  if (operators.includes(lastChar)) {
+    // Если тот же оператор — ничего не делаем
+    if (lastChar === operator) {
+      return;
+    }
+
+    // Иначе заменяем
+    display.value = value.slice(0, -1) + operator;
+    return;
+  }
+
+  display.value += operator;
+}
+
+function tokenize(expression) {
+  const tokens = [];
+  let number = "";
+
+  for (let i = 0; i < expression.length; i++) {
+    const char = expression[i];
+
+    if ("0123456789.".includes(char)) {
+      number += char;
+    } else {
+      if (number !== "") {
+        tokens.push(number);
+        number = "";
+      }
+
+      // Отрицательное число
+      if (
+        char === "-" &&
+        (i === 0 ||
+          operators.includes(expression[i - 1]) ||
+          expression[i - 1] === "(")
+      ) {
+        number = "-";
+      } else {
+        tokens.push(char);
+      }
+    }
+  }
+
+  if (number !== "") {
+    tokens.push(number);
+  }
+
+  return tokens;
+}
+
+function precedence(op) {
+  if (op === "+" || op === "-") return 1;
+  if (op === "*" || op === "/") return 2;
+  return 0;
+}
+
+function applyOperator(values, op) {
+  const b = values.pop();
+  const a = values.pop();
+
+  switch (op) {
+    case "+":
+      values.push(a + b);
+      break;
+    case "-":
+      values.push(a - b);
+      break;
+    case "*":
+      values.push(a * b);
+      break;
+    case "/":
+      values.push(a / b);
+      break;
+  }
+}
+
+function evaluate(expression) {
+  const tokens = tokenize(expression);
+
+  const values = [];
+  const ops = [];
+
+  for (let token of tokens) {
+    if (!isNaN(token)) {
+      values.push(parseFloat(token));
+    } else if (token === "(") {
+      ops.push(token);
+    } else if (token === ")") {
+      while (ops.length && ops[ops.length - 1] !== "(") {
+        applyOperator(values, ops.pop());
+      }
+
+      ops.pop();
+    } else if (operators.includes(token)) {
+      while (
+        ops.length &&
+        precedence(ops[ops.length - 1]) >= precedence(token)
+      ) {
+        applyOperator(values, ops.pop());
+      }
+
+      ops.push(token);
+    }
+  }
+
+  while (ops.length) {
+    applyOperator(values, ops.pop());
+  }
+
+  return values[0];
+}
+
 function calculate() {
   try {
-    const expression = display.value;
+    const result = evaluate(display.value);
 
-    const tokens = expression.match(/(\d+(\.\d+)?)|[+\-*/%]/g);
-
-    if (!tokens) {
+    if (!isFinite(result)) {
       display.value = "Ошибка";
       return;
     }
 
-    let stack = [];
-    let current = parseFloat(tokens[0]);
-
-    for (let i = 1; i < tokens.length; i += 2) {
-      const operator = tokens[i];
-      const next = parseFloat(tokens[i + 1]);
-
-      if (operator === "*") {
-        current *= next;
-      } else if (operator === "/") {
-        current /= next;
-      } else if (operator === "%") {
-        current %= next;
-      } else {
-        stack.push(current);
-        stack.push(operator);
-        current = next;
-      }
-    }
-
-    stack.push(current);
-
-    let result = stack[0];
-
-    for (let i = 1; i < stack.length; i += 2) {
-      const operator = stack[i];
-      const next = stack[i + 1];
-
-      if (operator === "+") {
-        result += next;
-      } else if (operator === "-") {
-        result -= next;
-      }
-    }
-
     display.value = result;
-  } catch (e) {
+  } catch {
     display.value = "Ошибка";
   }
 }
